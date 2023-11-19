@@ -1,0 +1,220 @@
+---
+title: "EDA Lab Assignment JVGiannantonio"
+output:
+  html_document:
+    df_print: paged
+date: "2023-11-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# EDA LAB Assignment
+
+## J. Vincent Giannantonio
+
+```{r}
+library(ggplot2)
+
+ames <- read.csv("~/Datasets/ames.csv")
+head(ames)
+attach(ames)
+
+```
+
+### 2
+
+#### Histogram of Sale Price
+
+```{r}
+ggplot(ames, aes(x=SalePrice))+ 
+  geom_histogram(fill="blue",bins=45)+
+  ggtitle("Distribution of Sale Prices")+
+  xlab("Sale Price")+
+  ylab("Number of Houses")+
+  geom_vline(xintercept = mean(SalePrice, na.rm=TRUE))
+
+```
+
+```{r}
+mean(SalePrice)
+median(SalePrice)
+sd(SalePrice)
+
+```
+
+Looks like a log normal distribution. Most houses in this sample are clustered around the median value of \$163,000, but the higher-end homes are pulling the mean up to over \$180,000
+
+#### Histogram of Rooms Above Grade
+
+```{r}
+ggplot(ames, aes(x=TotRmsAbvGrd))+ 
+  geom_histogram(fill="blue",bins=45)+
+  ggtitle("Distribution of Total Rooms Above Grade")+
+  xlab("Total Rooms (Does Not Include Bathrooms")+
+  ylab("Number of Houses")+
+  geom_vline(xintercept = mean(TotRmsAbvGrd, na.rm=TRUE))
+
+```
+
+```{r}
+mean(TotRmsAbvGrd)
+median(TotRmsAbvGrd)
+sd(TotRmsAbvGrd)
+
+```
+
+The number of rooms in houses is approximately normally distributed, with a mean and median around 6 rooms. There are some houses with twice as many rooms as the average, but overall the distribution is less skewed than the sale price distribution
+
+#### Histogram of Overall Condition
+
+```{r}
+ggplot(ames, aes(x=OverallCond))+ 
+  geom_histogram(fill="blue",bins=45)+
+  ggtitle("Distribution of Overall Condition of Houses on a 1-10 Scale")+
+  xlab("Condition of House")+
+  ylab("Number of Houses")+
+  geom_vline(xintercept = mean(OverallCond, na.rm=TRUE))
+
+```
+
+```{r}
+mean(OverallCond)
+median(OverallCond)
+sd(OverallCond)
+
+```
+
+Most homes have a condition of 5. It seems like we should treat this as a categorical rather than numeric variable, since the difference between conditions is so abrupt
+
+### 3
+
+```{r}
+below_average_condition <- subset(ames, OverallCond < 5)
+average_condition <- subset(ames, OverallCond == 5)
+above_average_condition <- subset(ames, OverallCond > 5)
+
+```
+
+```{r}
+ggplot()+ 
+  geom_histogram(aes(x=below_average_condition$SalePrice, fill="Below Average"), alpha=0.5, bins=70)+
+  geom_histogram(aes(x=average_condition$SalePrice, fill="Average"), alpha=0.3, bins=70)+
+  geom_histogram(aes(x=above_average_condition$SalePrice, fill="Above Average"), alpha=0.5, bins=70)+
+  ggtitle("Distributions of Sale Price Grouped by Condition")+
+  xlab("Sale Price")+
+  ylab("Number of Houses")
+
+```
+
+First, we note again that the majority of the houses have average condition, then about 1/3 have above average condition, then less than 10% have below average condition.
+
+As we might expect, the average condition therefore contains houses across a broader spectrum of the sale price range than either the below-average or above-average houses.
+
+Another unsurprising finding is that below-average condition houses have a price distribution that is much lower than average or above-average condition houses.
+
+But what might be surprising is that above-average condition houses do not seem to have higher average sale prices than average condition houses. In fact, above-average condition houses seem more clustered around a particular price range, especially the \$100,000 to \$200,000 range, whereas average condition houses are more frequent above \$200,000. We might want to investigate further to understand what kinds of houses are rated as above-average condition, since this goes against a standard assumption that better condition would mean higher cost.
+
+### 4
+
+```{r}
+library(dplyr)
+
+ames_num <- ames %>% select_if(is.numeric)
+
+sort(cor(ames_num$SalePrice, ames_num[,]))
+
+```
+
+Use the highest and lowest values above to match with the their corresponding variable names below, since this will be faster than me having to figure out how to code this without ripping off ChatGPT.
+
+
+```{r}
+cor(ames_num$SalePrice, ames_num[,])
+
+```
+
+Highest: OverallQual
+
+Maximum Correlation Value: 0.7909816
+
+
+Lowest: KitchenAbvGr
+
+Minimum Correlation Value: -0.1359074
+
+
+```{r}
+ggplot(ames, aes(x=factor(OverallQual), y=SalePrice, fill=ames$OverallQual)) + 
+  geom_boxplot()+
+  ggtitle("Overall Quality vs. Sale Price")+
+  xlab("Overall Quality")+
+  ylab("Sale Price")
+
+```
+
+```{r}
+ggplot(ames, aes(x=factor(KitchenAbvGr), y=SalePrice, fill=ames$KitchenAbvGr)) + 
+  geom_boxplot()+
+  ggtitle("Number of Kitchens vs. Sale Price")+
+  xlab("Number of Kitchens Above Ground")+
+  ylab("Sale Price")
+
+```
+
+
+The column with the highest correlation is overall quality. According to the data description:
+
+OverallQual: Rates the overall material and finish of the house
+
+       10   Very Excellent
+       9    Excellent
+       8    Very Good
+       7    Good
+       6    Above Average
+       5    Average
+       4    Below Average
+       3    Fair
+       2    Poor
+       1    Very Poor
+       
+
+It is somewhat difficult to understand how this is different from OverallCond, which has similar values.
+
+There is a clear positive relationship between overall quality and sale price, although it looks like potentially an exponential relationship rather than a linear one. For example, the minimum "non-outlier" (Q1 - 1.5\*IQR) home with quality 10 (Very Excellent) sells for about the same price as the median home with quality 6 (Above Average).
+
+The column with the most negative correlation is the number of kitchens above ground. According to the data description:
+
+KitchenAbvGr: Kitchens above grade
+
+From the plot, it is clear that almost all houses have 1 or 2 kitchens above grade, although there are some with 0 or 3.
+
+Somewhat similar to the earlier OverallCond discussion, it seems that more kitchens are associated with lower price, which is somewhat counterintuitive. Essentially all of the houses with 2 kitchens sold for less than \$200,000, whereas homes with 1 kitchen sometimes sold for much more.
+
+One thing we might want to investigate is what kinds of homes have two kitchens. Are they also homes with low quality, possibly student housing at Iowa State University?
+
+
+
+
+### 5
+
+```{r}
+table(YrSold)
+
+```
+
+```{r}
+ames$Age = YrSold - YearBuilt
+attach(ames)
+```
+
+```{r}
+plot(Age,SalePrice,xlab="Age of Home at Time of Sale", ylab="Sale Price", col="forestgreen")
+title("Home Age vs. Sale Price")
+
+```
+
+In general, newer houses appear to be more valuable, with value increasing as homes age. Interestingly the variance seems to increase once the home age goes over 100 years, with several above-average sale prices and fewer home sales in general.
+
+We are also seeing potential housing booms and busts over the past decades, indicated by e.g. relatively few 20-year-old houses compared to 25-year-old houses being sold. We might find something interesting if we investigae this further.
